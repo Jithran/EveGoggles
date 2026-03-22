@@ -21,6 +21,7 @@ All notable changes to EveGoggles are documented here.
   - **Stacked**: vertical column on the left (25% width), aspect ratio preserved, overflows clamped to available height
   - **Mosaic**: fills the entire preview monitor; cells stretch to fill the grid, no fixed aspect ratio; grid dimensions chosen to minimise empty slots
 - Layout calculations now use `_NET_WORKAREA` via Xlib as a fallback when Qt's `availableGeometry()` reports the wrong height on Wayland/XWayland, preventing thumbnails from overlapping the taskbar
+- Desktop shortcut failed to launch from the application menu because `Exec` used a relative path; now uses the absolute install path with a `Path=` working directory
 - Active client border is now drawn correctly — the image label is inset by the border thickness when the thumbnail is active, so the painted border is no longer hidden behind the label
 - Aspect ratio for Stacked layout is derived from the game monitor's Qt geometry (always accurate) instead of X11 window geometry (unreliable on Wayland)
 - When a new EVE client is detected, the active dynamic preset is automatically re-applied so the new thumbnail is placed correctly instead of appearing at a random position

@@ -58,13 +58,15 @@ echo ""
 
 # ── Desktop shortcut ──────────────────────────────────────────────────────────
 echo "[3/3] Creating desktop shortcut..."
+INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
 DESKTOP_FILE="$HOME/.local/share/applications/evegoggles.desktop"
 mkdir -p "$HOME/.local/share/applications"
 cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Name=EveGoggles
 Comment=EVE Online multi-client window manager
-Exec=$(dirname "$0")/evegoggles.sh
+Exec=$INSTALL_DIR/evegoggles.sh
+Path=$INSTALL_DIR
 Type=Application
 Categories=Game;Utility;
 StartupNotify=false
