@@ -52,30 +52,23 @@ def compute_mosaic_layout(
 ) -> list[ThumbnailLayout]:
     """
     Fill the entire preview monitor with thumbnails in the best grid layout.
-    Picks cols/rows to minimise empty slots and maximise thumbnail size.
+    Uses ceil(sqrt(n)) columns to produce the most square-ish grid, which
+    gives well-proportioned cells on widescreen monitors.
       n=1  → 1×1
       n=2  → 2×1
-      n=3  → 3×1
+      n=3  → 2×2  (1 empty slot bottom-right)
       n=4  → 2×2
       n=5  → 3×2  (1 empty slot)
       n=6  → 3×2
-      n=7  → 4×2  (1 empty slot)
-      n=8  → 4×2
+      n=7  → 3×3  (2 empty slots)
+      n=8  → 3×3  (1 empty slot)
       n=9  → 3×3
     """
     if n_clients < 1:
         return []
 
-    # Find cols/rows that minimise empty slots, prefer wider grids
-    best_cols, best_rows = n_clients, 1
-    best_waste = n_clients - 1
-    for c in range(1, n_clients + 1):
-        r = math.ceil(n_clients / c)
-        waste = c * r - n_clients
-        if waste < best_waste or (waste == best_waste and abs(c - r) < abs(best_cols - best_rows)):
-            best_cols, best_rows = c, r
-            best_waste = waste
-    cols, rows = best_cols, best_rows
+    cols = math.ceil(math.sqrt(n_clients))
+    rows = math.ceil(n_clients / cols)
 
     # Fill each cell completely — no aspect ratio constraint
     thumb_w = preview_monitor_w // cols

@@ -1,32 +1,29 @@
 """EveGoggles entry point."""
+import os
 import sys
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
-from PyQt6.QtGui import QIcon, QColor, QPixmap, QPainter
-from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import QTimer
 
 from .config import load_config, save_config
 from .app import EveGogglesApp
 from .control_panel import ControlPanel
 
+_ICON_PATH = os.path.join(os.path.dirname(__file__), "..", "assets", "evegoggles.svg")
 
-def _make_tray_icon() -> QIcon:
-    pix = QPixmap(32, 32)
-    pix.fill(QColor(0, 0, 0, 0))
-    painter = QPainter(pix)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setBrush(QColor("#00aaff"))
-    painter.setPen(QColor("#0077cc"))
-    painter.drawEllipse(2, 2, 28, 28)
-    painter.setPen(QColor("white"))
-    painter.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, "EG")
-    painter.end()
-    return QIcon(pix)
+
+def _app_icon() -> QIcon:
+    icon = QIcon.fromTheme("evegoggles")
+    if icon.isNull():
+        icon = QIcon(os.path.abspath(_ICON_PATH))
+    return icon
 
 
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("EveGoggles")
     app.setQuitOnLastWindowClosed(False)
+    app.setWindowIcon(_app_icon())
 
     cfg = load_config()
     goggles = EveGogglesApp(cfg, app)
@@ -98,7 +95,7 @@ def main():
     client_timer.start(1000)
 
     # ── System tray ───────────────────────────────────────────────────────────
-    tray = QSystemTrayIcon(_make_tray_icon(), parent=app)
+    tray = QSystemTrayIcon(_app_icon(), parent=app)
     tray_menu = QMenu()
     show_action = tray_menu.addAction("Show Control Panel")
     show_action.triggered.connect(panel.show)

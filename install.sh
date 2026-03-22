@@ -56,9 +56,18 @@ pip install "python-mss" 2>/dev/null \
 echo "  Python packages done."
 echo ""
 
-# ── Desktop shortcut ──────────────────────────────────────────────────────────
-echo "[3/3] Creating desktop shortcut..."
+# ── Icon ──────────────────────────────────────────────────────────────────────
+echo "[3/4] Installing icon..."
 INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
+ICON_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
+mkdir -p "$ICON_DIR"
+cp "$INSTALL_DIR/assets/evegoggles.svg" "$ICON_DIR/evegoggles.svg"
+gtk-update-icon-cache "$HOME/.local/share/icons/hicolor/" 2>/dev/null || true
+echo "  Icon installed."
+echo ""
+
+# ── Desktop shortcut ──────────────────────────────────────────────────────────
+echo "[4/4] Creating desktop shortcut..."
 DESKTOP_FILE="$HOME/.local/share/applications/evegoggles.desktop"
 mkdir -p "$HOME/.local/share/applications"
 cat > "$DESKTOP_FILE" <<EOF
@@ -67,11 +76,13 @@ Name=EveGoggles
 Comment=EVE Online multi-client window manager
 Exec=$INSTALL_DIR/evegoggles.sh
 Path=$INSTALL_DIR
+Icon=evegoggles
 Type=Application
 Categories=Game;Utility;
 StartupNotify=false
 EOF
 chmod +x "$DESKTOP_FILE"
+update-desktop-database "$HOME/.local/share/applications/" 2>/dev/null || true
 echo "  Desktop shortcut created: $DESKTOP_FILE"
 echo ""
 

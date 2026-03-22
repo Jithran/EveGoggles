@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#112244"/>
+      <stop offset="100%" stop-color="#060d1a"/>
+    </radialGradient>
+    <radialGradient id="lensGrad" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#1a3a5c"/>
+      <stop offset="100%" stop-color="#040e1c"/>
+    </radialGradient>
+    <radialGradient id="glowLeft" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00aaff" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#00aaff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowRight" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00aaff" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#00aaff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect width="256" height="256" rx="44" fill="url(#bgGrad)"/>
+
+  <!-- Subtle outer glow on lenses -->
+  <circle cx="82" cy="132" r="62" fill="url(#glowLeft)"/>
+  <circle cx="174" cy="132" r="62" fill="url(#glowRight)"/>
+
+  <!-- Left goggle lens body -->
+  <circle cx="82" cy="132" r="52" fill="url(#lensGrad)" stroke="#00aaff" stroke-width="6"/>
+  <!-- Left inner detail ring -->
+  <circle cx="82" cy="132" r="36" fill="none" stroke="#005588" stroke-width="2"/>
+  <!-- Left eye -->
+  <circle cx="82" cy="132" r="20" fill="#00aaff" filter="url(#glow)"/>
+  <circle cx="82" cy="132" r="11" fill="#060d1a"/>
+  <circle cx="82" cy="132" r="5"  fill="#44ccff"/>
+  <!-- Left lens glint -->
+  <circle cx="66" cy="116" r="6" fill="white" opacity="0.10"/>
+
+  <!-- Right goggle lens body -->
+  <circle cx="174" cy="132" r="52" fill="url(#lensGrad)" stroke="#00aaff" stroke-width="6"/>
+  <!-- Right inner detail ring -->
+  <circle cx="174" cy="132" r="36" fill="none" stroke="#005588" stroke-width="2"/>
+  <!-- Right eye -->
+  <circle cx="174" cy="132" r="20" fill="#00aaff" filter="url(#glow)"/>
+  <circle cx="174" cy="132" r="11" fill="#060d1a"/>
+  <circle cx="174" cy="132" r="5"  fill="#44ccff"/>
+  <!-- Right lens glint -->
+  <circle cx="158" cy="116" r="6" fill="white" opacity="0.10"/>
+
+  <!-- Bridge connecting the two lenses -->
+  <path d="M134 125 Q128 119 122 125 L122 139 Q128 145 134 139 Z" fill="#00aaff"/>
+
+  <!-- Left strap cap -->
+  <rect x="18" y="122" width="12" height="20" rx="6" fill="#00aaff" opacity="0.85"/>
+  <!-- Right strap cap -->
+  <rect x="226" y="122" width="12" height="20" rx="6" fill="#00aaff" opacity="0.85"/>
+</svg>
