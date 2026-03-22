@@ -1,0 +1,6 @@
+{
+  "name": "Stacked",
+  "description": "Column of previews on the left (25% width), rest of screen free",
+  "mode": "stacked",
+  "thumbnails": []
+}

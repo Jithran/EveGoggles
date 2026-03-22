@@ -1,0 +1,6 @@
+PyQt6>=6.4.0
+python-xlib>=0.33
+ewmh>=0.1.6
+# pynput>=1.7.6  # replaced by Xlib-based XGrabKey implementation
+Pillow>=10.0.0
+# python-mss>=9.0.0  # optional - no Python 3.14 support yet; ImageMagick used as fallback

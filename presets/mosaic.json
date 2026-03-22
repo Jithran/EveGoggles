@@ -1,0 +1,6 @@
+{
+  "name": "Mosaic",
+  "description": "Fill the entire preview monitor with thumbnails in the best grid layout",
+  "mode": "mosaic",
+  "thumbnails": []
+}
