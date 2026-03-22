@@ -1,6 +1,8 @@
 # EveGoggles
 
-A Linux-native multi-client window manager for EVE Online — a direct replacement for the Windows-only [eve-o-preview](https://github.com/Invalidation/eve-o-preview) tool.
+A Linux-native multi-client window manager for EVE Online
+
+![EveGoggles screenshot](assets/screenshot01.png) — a direct replacement for the Windows-only [eve-o-preview](https://github.com/Phrynohyas/eve-o-preview) tool.
 
 If you multibox EVE on Linux and want live thumbnail previews of your other clients that you can click to switch between, this is for you.
 

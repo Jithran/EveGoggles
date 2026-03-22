@@ -7,6 +7,7 @@ All notable changes to EveGoggles are documented here.
 ## [Unreleased]
 
 ### Added
+- Screenshot in `assets/screenshot01.png` added to README
 - Application icon (`assets/evegoggles.svg`) — goggles design in the app's blue/cyan colour scheme, visible in the taskbar, start menu and alt-tab switcher
 - `README.md` with project description, requirements, installation guide, usage instructions and troubleshooting
 - Sync resize: resizing one thumbnail resizes all others simultaneously
