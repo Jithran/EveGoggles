@@ -7,6 +7,7 @@ All notable changes to EveGoggles are documented here.
 ## [Unreleased]
 
 ### Added
+- `README.md` with project description, requirements, installation guide, usage instructions and troubleshooting
 - Sync resize: resizing one thumbnail resizes all others simultaneously
 - Ctrl+resize: hold Ctrl while resizing to lock aspect ratio to the starting dimensions
 - Grid snapping for resize (reuses the existing snap grid setting)
