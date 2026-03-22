@@ -37,6 +37,7 @@ def main():
     panel.refresh_spin.setValue(cfg.refresh_rate_ms)
     panel.show_names_cb.setChecked(cfg.show_client_name)
     panel.snap_cb.setChecked(cfg.snap_to_grid)
+    panel.sync_resize_cb.setChecked(cfg.sync_resize)
 
     # Show detected monitors immediately
     monitors = goggles.get_monitors()

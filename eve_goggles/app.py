@@ -202,6 +202,7 @@ class EveGogglesApp:
                     title=win.title,
                     short_name=win.short_name,
                     on_activate=self._on_thumbnail_activate,
+                    on_resize=self._on_thumbnail_resize,
                     snap_grid=self._cfg.snap_grid_size if self._cfg.snap_to_grid else 0,
                 )
                 tw.set_highlight(self._cfg.highlight_color, self._cfg.highlight_thickness)
@@ -251,6 +252,15 @@ class EveGogglesApp:
             if win.xid == xid:
                 self._wm.activate(win)
                 break
+
+    def _on_thumbnail_resize(self, source_xid: int, w: int, h: int):
+        """Sync all other thumbnails to the same size as the one being resized."""
+        if not self._cfg.sync_resize:
+            return
+        for xid, tw in self._thumbnails.items():
+            if xid != source_xid:
+                tw.resize(w, h)
+        self._update_capture_targets()
 
     # ── Lock ─────────────────────────────────────────────────────────────────
 

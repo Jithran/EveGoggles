@@ -19,6 +19,7 @@ class ThumbnailWidget(QWidget):
         title: str,
         short_name: str,
         on_activate: Callable[[int], None],
+        on_resize: Optional[Callable[[int, int, int], None]] = None,
         snap_grid: int = 0,
         parent=None,
     ):
@@ -27,6 +28,7 @@ class ThumbnailWidget(QWidget):
         self.title = title
         self.short_name = short_name
         self._on_activate = on_activate
+        self._on_resize = on_resize   # on_resize(xid, w, h)
         self._snap_grid = snap_grid
 
         self._locked = False
@@ -47,7 +49,8 @@ class ThumbnailWidget(QWidget):
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
-            Qt.WindowType.Tool
+            Qt.WindowType.Tool |
+            Qt.WindowType.X11BypassWindowManagerHint
         )
         # No WA_TranslucentBackground - makes everything invisible on some compositors
         self.setStyleSheet("background: #111;")
@@ -162,9 +165,24 @@ class ThumbnailWidget(QWidget):
 
         if self._resizing and self._resize_start_pos and self._resize_start_size:
             delta = gpos - self._resize_start_pos
-            new_w = max(120, self._resize_start_size[0] + delta.x())
-            new_h = max(68,  self._resize_start_size[1] + delta.y())
+            start_w, start_h = self._resize_start_size
+            new_w = max(120, start_w + delta.x())
+            new_h = max(68,  start_h + delta.y())
+
+            # Ctrl held: lock aspect ratio to the starting dimensions
+            if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                ar = start_w / start_h
+                new_h = max(68, int(new_w / ar))
+
+            # Snap resize to grid
+            if self._snap_grid > 0:
+                g = self._snap_grid
+                new_w = max(120, round(new_w / g) * g)
+                new_h = max(68,  round(new_h / g) * g)
+
             self.resize(new_w, new_h)
+            if self._on_resize:
+                self._on_resize(self.xid, new_w, new_h)
             self.setCursor(QCursor(Qt.CursorShape.SizeFDiagCursor))
             return
 

@@ -128,6 +128,12 @@ class ControlPanel(QWidget):
             lambda v: self.settings_changed.emit({"snap_to_grid": v}))
         sl.addWidget(self.snap_cb)
 
+        self.sync_resize_cb = QCheckBox("Sync resize (all same size)")
+        self.sync_resize_cb.setChecked(True)
+        self.sync_resize_cb.toggled.connect(
+            lambda v: self.settings_changed.emit({"sync_resize": v}))
+        sl.addWidget(self.sync_resize_cb)
+
         opacity_row = QHBoxLayout()
         opacity_row.addWidget(QLabel("Opacity:"))
         self.opacity_slider = QSlider(Qt.Orientation.Horizontal)

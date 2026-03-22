@@ -30,8 +30,9 @@ class AppConfig:
     hotkey_toggle_thumbnails: str = "<ctrl>+<shift>+h"
     snap_to_grid: bool = True
     snap_grid_size: int = 20
+    sync_resize: bool = True            # resize all thumbnails together
     window_filter: str = "EVE - "       # window title prefix to match
-    preview_monitor_index: int = 1      # 0 = leftmost monitor, 1 = tweede monitor
+    preview_monitor_index: int = 1      # 0 = leftmost, 1 = second monitor
     last_window_positions: dict = field(default_factory=dict)
 
 
