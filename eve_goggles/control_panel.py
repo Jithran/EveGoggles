@@ -1,11 +1,13 @@
 """Control panel - preset picker, lock toggle, settings."""
+import math
+
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QListWidget, QGroupBox, QSlider, QCheckBox,
     QLineEdit, QDialog, QDialogButtonBox, QSpinBox, QColorDialog,
-    QSystemTrayIcon,
+    QSystemTrayIcon, QGridLayout,
 )
 
 from .presets import Preset
@@ -34,9 +36,246 @@ class SavePresetDialog(QDialog):
         return self.name_edit.text().strip(), self.desc_edit.text().strip()
 
 
+class ZonePreviewWidget(QWidget):
+    """Paints a scaled monitor with the selected zone and thumbnail slots."""
+
+    _MONITOR_BG   = QColor(30, 30, 30)
+    _MONITOR_EDGE = QColor(70, 70, 70)
+    _ZONE_FILL    = QColor(0, 120, 200, 50)
+    _ZONE_EDGE    = QColor(0, 170, 255)
+    _THUMB_FILL   = QColor(0, 170, 255, 35)
+    _THUMB_EDGE   = QColor(0, 170, 255, 160)
+    _ARROW_COL    = QColor(255, 200, 0)
+    _N_PREVIEW    = 4   # number of fake clients shown in the preview
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(260, 146)   # ~16:9
+        self._sx = 0.0
+        self._sy = 0.0
+        self._ex = 0.25
+        self._ey = 1.0
+        self._fill = "column"
+        self._reverse = False
+
+    def set_zone(self, sx: int, sy: int, ex: int, ey: int, fill: str, reverse: bool = False):
+        self._sx = sx / 100
+        self._sy = sy / 100
+        self._ex = ex / 100
+        self._ey = ey / 100
+        self._fill = fill.lower()
+        self._reverse = reverse
+        self.update()
+
+    def paintEvent(self, _event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        W, H = self.width(), self.height()
+
+        # Monitor background
+        p.fillRect(0, 0, W, H, self._MONITOR_BG)
+        p.setPen(QPen(self._MONITOR_EDGE, 1))
+        p.drawRect(0, 0, W - 1, H - 1)
+
+        # Zone rectangle
+        zx = int(self._sx * W)
+        zy = int(self._sy * H)
+        zw = max(4, int((self._ex - self._sx) * W))
+        zh = max(4, int((self._ey - self._sy) * H))
+        p.fillRect(zx, zy, zw, zh, self._ZONE_FILL)
+        p.setPen(QPen(self._ZONE_EDGE, 2))
+        p.drawRect(zx, zy, zw, zh)
+
+        # Thumbnail slots
+        n = self._N_PREVIEW
+        p.setPen(QPen(self._THUMB_EDGE, 1))
+        if self._fill == "grid":
+            cols = math.ceil(math.sqrt(n))
+            rows = math.ceil(n / cols)
+            tw = zw // cols
+            th = zh // rows
+            for i in range(n):
+                row, col = divmod(i, cols)
+                p.fillRect(zx + col * tw + 1, zy + row * th + 1, tw - 2, th - 2, self._THUMB_FILL)
+                p.drawRect(zx + col * tw + 1, zy + row * th + 1, tw - 2, th - 2)
+        elif self._fill == "column":
+            th = zh // n
+            for i in range(n):
+                p.fillRect(zx + 1, zy + i * th + 1, zw - 2, th - 2, self._THUMB_FILL)
+                p.drawRect(zx + 1, zy + i * th + 1, zw - 2, th - 2)
+        elif self._fill == "row":
+            tw = zw // n
+            for i in range(n):
+                p.fillRect(zx + i * tw + 1, zy + 1, tw - 2, zh - 2, self._THUMB_FILL)
+                p.drawRect(zx + i * tw + 1, zy + 1, tw - 2, zh - 2)
+
+        # Direction arrow inside the zone
+        p.setPen(QPen(self._ARROW_COL, 2))
+        cx = zx + zw // 2
+        cy = zy + zh // 2
+        aw = min(zw, zh) // 4
+        if self._fill == "column":
+            if self._reverse:
+                # Arrow pointing up
+                p.drawLine(cx, cy + aw, cx, cy - aw)
+                p.drawLine(cx, cy - aw, cx - aw // 2, cy - aw // 2)
+                p.drawLine(cx, cy - aw, cx + aw // 2, cy - aw // 2)
+            else:
+                # Arrow pointing down
+                p.drawLine(cx, cy - aw, cx, cy + aw)
+                p.drawLine(cx, cy + aw, cx - aw // 2, cy + aw // 2)
+                p.drawLine(cx, cy + aw, cx + aw // 2, cy + aw // 2)
+        elif self._fill == "row":
+            if self._reverse:
+                # Arrow pointing left
+                p.drawLine(cx + aw, cy, cx - aw, cy)
+                p.drawLine(cx - aw, cy, cx - aw // 2, cy - aw // 2)
+                p.drawLine(cx - aw, cy, cx - aw // 2, cy + aw // 2)
+            else:
+                # Arrow pointing right
+                p.drawLine(cx - aw, cy, cx + aw, cy)
+                p.drawLine(cx + aw, cy, cx + aw // 2, cy - aw // 2)
+                p.drawLine(cx + aw, cy, cx + aw // 2, cy + aw // 2)
+        elif self._fill == "grid":
+            # Grid symbol: small cross
+            p.drawLine(cx - aw, cy, cx + aw, cy)
+            p.drawLine(cx, cy - aw, cx, cy + aw)
+
+        p.end()
+
+
+class ZonePresetDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("New Zone Preset")
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel("Name:"))
+        self.name_edit = QLineEdit()
+        layout.addWidget(self.name_edit)
+
+        layout.addWidget(QLabel("Description (optional):"))
+        self.desc_edit = QLineEdit()
+        layout.addWidget(self.desc_edit)
+
+        zone_box = QGroupBox("Zone (% of monitor)")
+        zl = QGridLayout(zone_box)
+        zl.addWidget(QLabel("Start X:"), 0, 0)
+        self.start_x = QSpinBox()
+        self.start_x.setRange(0, 99)
+        self.start_x.setSuffix("%")
+        zl.addWidget(self.start_x, 0, 1)
+        zl.addWidget(QLabel("Start Y:"), 0, 2)
+        self.start_y = QSpinBox()
+        self.start_y.setRange(0, 99)
+        self.start_y.setSuffix("%")
+        zl.addWidget(self.start_y, 0, 3)
+        zl.addWidget(QLabel("End X:"), 1, 0)
+        self.end_x = QSpinBox()
+        self.end_x.setRange(1, 100)
+        self.end_x.setSuffix("%")
+        self.end_x.setValue(25)
+        zl.addWidget(self.end_x, 1, 1)
+        zl.addWidget(QLabel("End Y:"), 1, 2)
+        self.end_y = QSpinBox()
+        self.end_y.setRange(1, 100)
+        self.end_y.setSuffix("%")
+        self.end_y.setValue(100)
+        zl.addWidget(self.end_y, 1, 3)
+        layout.addWidget(zone_box)
+
+        fill_row = QHBoxLayout()
+        fill_row.addWidget(QLabel("Fill mode:"))
+        self.fill_combo = QComboBox()
+        self.fill_combo.addItems(["Grid", "Column", "Row"])
+        self.fill_combo.setCurrentText("Column")
+        fill_row.addWidget(self.fill_combo)
+        layout.addLayout(fill_row)
+
+        self.lock_aspect_cb = QCheckBox("Lock aspect ratio")
+        layout.addWidget(self.lock_aspect_cb)
+
+        self.reverse_cb = QCheckBox("Reverse order (bottom-up / right-to-left)")
+        layout.addWidget(self.reverse_cb)
+
+        # Live visual preview
+        preview_box = QGroupBox("Preview (4 clients)")
+        pb = QVBoxLayout(preview_box)
+        self._preview = ZonePreviewWidget()
+        pb.addWidget(self._preview, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(preview_box)
+
+        # Connect all inputs to preview update
+        self.start_x.valueChanged.connect(self._update_preview)
+        self.start_y.valueChanged.connect(self._update_preview)
+        self.end_x.valueChanged.connect(self._update_preview)
+        self.end_y.valueChanged.connect(self._update_preview)
+        self.fill_combo.currentTextChanged.connect(self._update_preview)
+        self.reverse_cb.toggled.connect(self._update_preview)
+        self._update_preview()
+
+        btns = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        btns.accepted.connect(self._validate_and_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def prefill(self, preset: "Preset"):
+        self.name_edit.setText(preset.name)
+        self.desc_edit.setText(preset.description)
+        self.start_x.setValue(int(preset.zone_x_pct * 100))
+        self.start_y.setValue(int(preset.zone_y_pct * 100))
+        self.end_x.setValue(int((preset.zone_x_pct + preset.zone_w_pct) * 100))
+        self.end_y.setValue(int((preset.zone_y_pct + preset.zone_h_pct) * 100))
+        self.fill_combo.setCurrentText(preset.zone_fill.capitalize())
+        self.lock_aspect_cb.setChecked(preset.zone_lock_aspect)
+        self.reverse_cb.setChecked(preset.zone_reverse)
+
+    def _update_preview(self, *_):
+        self._preview.set_zone(
+            self.start_x.value(), self.start_y.value(),
+            self.end_x.value(), self.end_y.value(),
+            self.fill_combo.currentText(),
+            reverse=self.reverse_cb.isChecked(),
+        )
+
+    def _validate_and_accept(self):
+        if not self.name_edit.text().strip():
+            self.name_edit.setPlaceholderText("Name is required")
+            return
+        if self.end_x.value() <= self.start_x.value():
+            self.end_x.setStyleSheet("border: 1px solid red;")
+            return
+        if self.end_y.value() <= self.start_y.value():
+            self.end_y.setStyleSheet("border: 1px solid red;")
+            return
+        self.accept()
+
+    def get_values(self) -> dict:
+        sx = self.start_x.value() / 100
+        sy = self.start_y.value() / 100
+        ex = self.end_x.value() / 100
+        ey = self.end_y.value() / 100
+        return {
+            "name": self.name_edit.text().strip(),
+            "description": self.desc_edit.text().strip(),
+            "zone_x_pct": sx,
+            "zone_y_pct": sy,
+            "zone_w_pct": ex - sx,
+            "zone_h_pct": ey - sy,
+            "zone_fill": self.fill_combo.currentText().lower(),
+            "zone_lock_aspect": self.lock_aspect_cb.isChecked(),
+            "zone_reverse": self.reverse_cb.isChecked(),
+        }
+
+
 class ControlPanel(QWidget):
     preset_requested = pyqtSignal(str)
     save_preset_requested = pyqtSignal(str, str)
+    zone_preset_requested = pyqtSignal(dict)
+    preset_delete_requested = pyqtSignal(str)
     settings_changed = pyqtSignal(dict)
     lock_toggled = pyqtSignal(bool)
     monitor_changed = pyqtSignal(int)   # preview monitor index
@@ -46,8 +285,10 @@ class ControlPanel(QWidget):
         super().__init__(parent)
         self.setWindowTitle("EveGoggles")
         self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint)
-        self.resize(300, 560)
+        self.resize(300, 580)
         self._locked = False
+        self._presets: dict = {}
+        self._deletable: set = set()
         self._setup_ui()
 
     def _setup_ui(self):
@@ -101,6 +342,25 @@ class ControlPanel(QWidget):
         btn_row.addWidget(self.apply_btn)
         btn_row.addWidget(self.save_btn)
         pl.addLayout(btn_row)
+
+        self.zone_btn = QPushButton("New Zone...")
+        self.zone_btn.setToolTip(
+            "Create a dynamic preset that fills a custom area of the monitor"
+        )
+        self.zone_btn.clicked.connect(self._create_zone_preset)
+        pl.addWidget(self.zone_btn)
+
+        edit_del_row = QHBoxLayout()
+        self.edit_btn = QPushButton("Edit")
+        self.edit_btn.setEnabled(False)
+        self.edit_btn.clicked.connect(self._edit_preset)
+        self.delete_btn = QPushButton("Delete")
+        self.delete_btn.setEnabled(False)
+        self.delete_btn.clicked.connect(self._delete_preset)
+        edit_del_row.addWidget(self.edit_btn)
+        edit_del_row.addWidget(self.delete_btn)
+        pl.addLayout(edit_del_row)
+
         root.addWidget(preset_box)
 
         self.preset_combo.currentTextChanged.connect(self._on_preset_selected)
@@ -207,7 +467,9 @@ class ControlPanel(QWidget):
             prefix = "▶ " if i == active_idx else "   "
             self.client_list.addItem(prefix + name)
 
-    def load_presets(self, presets: dict[str, "Preset"]):
+    def load_presets(self, presets: dict[str, "Preset"], deletable: set[str] = None):
+        self._presets = presets
+        self._deletable = deletable or set()
         current = self.preset_combo.currentText()
         self.preset_combo.blockSignals(True)
         self.preset_combo.clear()
@@ -219,8 +481,9 @@ class ControlPanel(QWidget):
         self._on_preset_selected(self.preset_combo.currentText())
 
     def _on_preset_selected(self, name: str):
-        # Will be connected externally to get description
-        pass
+        preset = self._presets.get(name)
+        self.edit_btn.setEnabled(preset is not None and preset.mode in ("zone", "static"))
+        self.delete_btn.setEnabled(name in self._deletable)
 
     def set_preset_description(self, desc: str):
         self.preset_desc.setText(desc)
@@ -244,6 +507,36 @@ class ControlPanel(QWidget):
         else:
             self.lock_btn.setText("🔓 Lock Thumbnails")
         self.lock_toggled.emit(locked)
+
+    def _create_zone_preset(self):
+        dlg = ZonePresetDialog(self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.zone_preset_requested.emit(dlg.get_values())
+
+    def _edit_preset(self):
+        name = self.preset_combo.currentText()
+        preset = self._presets.get(name)
+        if not preset:
+            return
+        if preset.mode == "zone":
+            dlg = ZonePresetDialog(self)
+            dlg.prefill(preset)
+            if dlg.exec() == QDialog.DialogCode.Accepted:
+                self.zone_preset_requested.emit(dlg.get_values())
+        else:
+            # Static preset: allow rename / description change
+            dlg = SavePresetDialog(self)
+            dlg.name_edit.setText(preset.name)
+            dlg.desc_edit.setText(preset.description)
+            if dlg.exec() == QDialog.DialogCode.Accepted:
+                new_name, new_desc = dlg.get_values()
+                if new_name:
+                    self.save_preset_requested.emit(new_name, new_desc)
+
+    def _delete_preset(self):
+        name = self.preset_combo.currentText()
+        if name:
+            self.preset_delete_requested.emit(name)
 
     def _pick_highlight_color(self):
         col = QColorDialog.getColor(QColor(self._highlight_color), self)

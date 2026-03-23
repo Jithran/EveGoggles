@@ -22,8 +22,16 @@ class ThumbnailLayout:
 class Preset:
     name: str
     description: str
-    mode: str = "static"          # "static" | "mining" | "productivity"
+    mode: str = "static"          # "static" | "stacked" | "mosaic" | "zone"
     thumbnails: list[ThumbnailLayout] = field(default_factory=list)
+    # Zone mode parameters (ignored for other modes)
+    zone_x_pct: float = 0.0       # left edge as fraction of monitor width  (0–1)
+    zone_y_pct: float = 0.0       # top edge as fraction of monitor height (0–1)
+    zone_w_pct: float = 1.0       # zone width as fraction of monitor width
+    zone_h_pct: float = 1.0       # zone height as fraction of monitor height
+    zone_fill: str = "grid"       # "grid" | "column" | "row"
+    zone_lock_aspect: bool = False
+    zone_reverse: bool = False    # fill in reverse order (bottom-up / right-to-left)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -36,10 +44,17 @@ class Preset:
             description=d.get("description", ""),
             mode=d.get("mode", "static"),
             thumbnails=thumbnails,
+            zone_x_pct=d.get("zone_x_pct", 0.0),
+            zone_y_pct=d.get("zone_y_pct", 0.0),
+            zone_w_pct=d.get("zone_w_pct", 1.0),
+            zone_h_pct=d.get("zone_h_pct", 1.0),
+            zone_fill=d.get("zone_fill", "grid"),
+            zone_lock_aspect=d.get("zone_lock_aspect", False),
+            zone_reverse=d.get("zone_reverse", False),
         )
 
     def is_dynamic(self) -> bool:
-        return self.mode in ("stacked", "mosaic")
+        return self.mode in ("stacked", "mosaic", "zone")
 
 
 def compute_mosaic_layout(
@@ -124,6 +139,115 @@ def compute_stacked_layout(
             height=thumb_h,
         ))
     return layouts
+
+
+def compute_zone_layout(
+    n_clients: int,
+    monitor_x: int,
+    monitor_y: int,
+    monitor_w: int,
+    monitor_h: int,
+    zone_x_pct: float,
+    zone_y_pct: float,
+    zone_w_pct: float,
+    zone_h_pct: float,
+    fill_mode: str = "grid",
+    lock_aspect: bool = False,
+    reverse: bool = False,
+    aspect_ratio: float = 16 / 9,
+) -> list[ThumbnailLayout]:
+    """
+    Fill a user-defined rectangular zone with thumbnails.
+
+    The zone is expressed as fractions of the monitor (0.0–1.0) so the
+    layout stays correct across different resolutions and monitor sizes.
+
+    fill_mode:
+      "grid"   — mini-mosaic; cells stretch to fill the zone
+      "column" — vertical stack; lock_aspect preserves game AR
+      "row"    — horizontal row; lock_aspect preserves game AR
+
+    reverse:
+      column → fills bottom-up instead of top-down
+      row    → fills right-to-left instead of left-to-right
+      grid   → fills from bottom-right instead of top-left
+    """
+    if n_clients < 1:
+        return []
+
+    zone_x = monitor_x + int(zone_x_pct * monitor_w)
+    zone_y = monitor_y + int(zone_y_pct * monitor_h)
+    zone_w = max(1, int(zone_w_pct * monitor_w))
+    zone_h = max(1, int(zone_h_pct * monitor_h))
+
+    if fill_mode == "grid":
+        layouts = compute_mosaic_layout(n_clients, zone_x, zone_y, zone_w, zone_h)
+        if reverse:
+            cols = math.ceil(math.sqrt(n_clients))
+            rows = math.ceil(n_clients / cols)
+            thumb_w = zone_w // cols
+            thumb_h = zone_h // rows
+            layouts = [
+                ThumbnailLayout(
+                    index=i,
+                    x=zone_x + (cols - 1 - (i % cols)) * thumb_w,
+                    y=zone_y + (rows - 1 - (i // cols)) * thumb_h,
+                    width=thumb_w,
+                    height=thumb_h,
+                )
+                for i in range(n_clients)
+            ]
+        return layouts
+
+    if fill_mode == "column":
+        if lock_aspect:
+            layouts = compute_stacked_layout(
+                n_clients, zone_x, zone_y, zone_w, zone_h,
+                max_column_pct=1.0,   # zone width is already the column
+                aspect_ratio=aspect_ratio,
+            )
+            if reverse:
+                # Flip y-positions within the zone
+                total_h = sum(l.height for l in layouts)
+                bottom = zone_y + zone_h
+                layouts = [
+                    ThumbnailLayout(l.index, l.x, bottom - total_h + (total_h - l.height - (l.y - zone_y)), l.width, l.height)
+                    for l in layouts
+                ]
+            return layouts
+        thumb_h = zone_h // n_clients
+        if reverse:
+            return [
+                ThumbnailLayout(i, zone_x, zone_y + zone_h - (i + 1) * thumb_h, zone_w, thumb_h)
+                for i in range(n_clients)
+            ]
+        return [
+            ThumbnailLayout(i, zone_x, zone_y + i * thumb_h, zone_w, thumb_h)
+            for i in range(n_clients)
+        ]
+
+    if fill_mode == "row":
+        if lock_aspect:
+            thumb_h = zone_h
+            thumb_w = int(thumb_h * aspect_ratio)
+            max_w = zone_w // n_clients
+            if thumb_w > max_w:
+                thumb_w = max_w
+                thumb_h = int(thumb_w / aspect_ratio)
+        else:
+            thumb_w = zone_w // n_clients
+            thumb_h = zone_h
+        if reverse:
+            return [
+                ThumbnailLayout(i, zone_x + zone_w - (i + 1) * thumb_w, zone_y, thumb_w, thumb_h)
+                for i in range(n_clients)
+            ]
+        return [
+            ThumbnailLayout(i, zone_x + i * thumb_w, zone_y, thumb_w, thumb_h)
+            for i in range(n_clients)
+        ]
+
+    return []
 
 
 # ── File IO ───────────────────────────────────────────────────────────────────

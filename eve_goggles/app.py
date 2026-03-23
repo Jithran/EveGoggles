@@ -1,4 +1,5 @@
 """Main application logic - discovery, background capture, hotkeys, presets."""
+import os
 import time
 from typing import Optional
 
@@ -12,7 +13,8 @@ from .thumbnail import ThumbnailWidget
 from .hotkeys import HotkeyManager
 from .presets import (
     Preset, ThumbnailLayout, load_all_presets, save_preset,
-    compute_mosaic_layout, compute_stacked_layout,
+    compute_mosaic_layout, compute_stacked_layout, compute_zone_layout,
+    PRESETS_DIR,
 )
 from . import capture
 
@@ -292,6 +294,18 @@ class EveGogglesApp:
                 n, pm.x(), pm.y(), pm.width(), pm.height(),
                 aspect_ratio=ar,
             )
+        elif preset.mode == "zone":
+            layouts = compute_zone_layout(
+                n, pm.x(), pm.y(), pm.width(), pm.height(),
+                zone_x_pct=preset.zone_x_pct,
+                zone_y_pct=preset.zone_y_pct,
+                zone_w_pct=preset.zone_w_pct,
+                zone_h_pct=preset.zone_h_pct,
+                fill_mode=preset.zone_fill,
+                lock_aspect=preset.zone_lock_aspect,
+                reverse=preset.zone_reverse,
+                aspect_ratio=ar,
+            )
         else:
             layouts = preset.thumbnails
 
@@ -321,6 +335,39 @@ class EveGogglesApp:
         save_preset(preset)
         self._presets[name] = preset
         return preset
+
+    def create_zone_preset(self, params: dict) -> Preset:
+        preset = Preset(
+            name=params["name"],
+            description=params.get("description", ""),
+            mode="zone",
+            zone_x_pct=params["zone_x_pct"],
+            zone_y_pct=params["zone_y_pct"],
+            zone_w_pct=params["zone_w_pct"],
+            zone_h_pct=params["zone_h_pct"],
+            zone_fill=params["zone_fill"],
+            zone_lock_aspect=params["zone_lock_aspect"],
+            zone_reverse=params.get("zone_reverse", False),
+        )
+        save_preset(preset)
+        self._presets[preset.name] = preset
+        return preset
+
+    def is_user_preset(self, name: str) -> bool:
+        safe = name.lower().replace(" ", "_")
+        return os.path.exists(os.path.join(PRESETS_DIR, f"{safe}.json"))
+
+    def delete_preset(self, name: str) -> bool:
+        """Delete a user preset from disk. Returns False for bundled presets."""
+        if not self.is_user_preset(name):
+            return False
+        safe = name.lower().replace(" ", "_")
+        os.remove(os.path.join(PRESETS_DIR, f"{safe}.json"))
+        self._presets.pop(name, None)
+        return True
+
+    def get_deletable_presets(self) -> set[str]:
+        return {name for name in self._presets if self.is_user_preset(name)}
 
     def get_presets(self) -> dict[str, Preset]:
         return self._presets

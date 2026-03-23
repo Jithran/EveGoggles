@@ -29,7 +29,7 @@ def main():
     goggles = EveGogglesApp(cfg, app)
 
     panel = ControlPanel()
-    panel.load_presets(goggles.get_presets())
+    panel.load_presets(goggles.get_presets(), goggles.get_deletable_presets())
     panel.opacity_slider.setValue(int(cfg.thumbnail_opacity * 100))
     panel.refresh_spin.setValue(cfg.refresh_rate_ms)
     panel.show_names_cb.setChecked(cfg.show_client_name)
@@ -50,7 +50,7 @@ def main():
 
     def on_save_preset(name, desc):
         goggles.save_current_as_preset(name, desc)
-        panel.load_presets(goggles.get_presets())
+        panel.load_presets(goggles.get_presets(), goggles.get_deletable_presets())
 
     def on_settings(changes: dict):
         for k, v in changes.items():
@@ -77,8 +77,20 @@ def main():
         save_config(cfg)
         app.quit()
 
+    def on_zone_preset(params: dict):
+        preset = goggles.create_zone_preset(params)
+        panel.load_presets(goggles.get_presets(), goggles.get_deletable_presets())
+        panel.set_preset_description(preset.description)
+        goggles.apply_preset(preset)
+
+    def on_preset_delete(name: str):
+        goggles.delete_preset(name)
+        panel.load_presets(goggles.get_presets(), goggles.get_deletable_presets())
+
     panel.preset_requested.connect(on_preset)
     panel.save_preset_requested.connect(on_save_preset)
+    panel.zone_preset_requested.connect(on_zone_preset)
+    panel.preset_delete_requested.connect(on_preset_delete)
     panel.settings_changed.connect(on_settings)
     panel.lock_toggled.connect(goggles.set_locked)
     panel.monitor_changed.connect(on_monitor_changed)
