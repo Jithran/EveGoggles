@@ -337,6 +337,7 @@ class EveGogglesApp:
         return preset
 
     def create_zone_preset(self, params: dict) -> Preset:
+        original = params.get("original_name")
         preset = Preset(
             name=params["name"],
             description=params.get("description", ""),
@@ -349,6 +350,9 @@ class EveGogglesApp:
             zone_lock_aspect=params["zone_lock_aspect"],
             zone_reverse=params.get("zone_reverse", False),
         )
+        # If editing with a renamed preset, remove the old one first
+        if original and original != preset.name:
+            self.delete_preset(original)
         save_preset(preset)
         self._presets[preset.name] = preset
         return preset

@@ -1,13 +1,14 @@
 """Control panel - preset picker, lock toggle, settings."""
 import math
+from typing import Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QPainter, QPen
+from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QRect, QTimer
+from PyQt6.QtGui import QColor, QPainter, QPen, QFont
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QListWidget, QGroupBox, QSlider, QCheckBox,
     QLineEdit, QDialog, QDialogButtonBox, QSpinBox, QColorDialog,
-    QSystemTrayIcon, QGridLayout,
+    QSystemTrayIcon, QGridLayout, QApplication,
 )
 
 from .presets import Preset
@@ -34,6 +35,134 @@ class SavePresetDialog(QDialog):
 
     def get_values(self) -> tuple[str, str]:
         return self.name_edit.text().strip(), self.desc_edit.text().strip()
+
+
+class ScreenSelectOverlay(QWidget):
+    """Full-screen drag-to-select overlay for picking a zone on the monitor."""
+    selection_made = pyqtSignal(float, float, float, float)  # x%, y%, w%, h% relative to monitor
+    closed = pyqtSignal()
+
+    def __init__(self):
+        super().__init__(None)
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.X11BypassWindowManagerHint |
+            Qt.WindowType.Tool,
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.setCursor(Qt.CursorShape.CrossCursor)
+
+        # Cover all screens
+        all_rect = QRect()
+        for screen in QApplication.instance().screens():
+            all_rect = all_rect.united(screen.geometry())
+        self._origin = all_rect.topLeft()
+        self.setGeometry(all_rect)
+
+        self._p1: Optional[QPoint] = None
+        self._p2: Optional[QPoint] = None
+        self._dragging = False
+
+    def _sel_rect(self) -> Optional[QRect]:
+        if self._p1 and self._p2:
+            return QRect(self._p1, self._p2).normalized()
+        return None
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+
+        # Dark overlay over everything
+        p.fillRect(self.rect(), QColor(0, 0, 0, 110))
+
+        sel = self._sel_rect()
+        if sel:
+            # Lighten the selected area
+            p.fillRect(sel, QColor(255, 255, 255, 25))
+            p.setPen(QPen(QColor(0, 170, 255), 2))
+            p.drawRect(sel)
+            # Corner handles
+            p.setPen(QPen(QColor(0, 170, 255), 3))
+            for cx, cy in [
+                (sel.left(), sel.top()), (sel.right(), sel.top()),
+                (sel.left(), sel.bottom()), (sel.right(), sel.bottom()),
+            ]:
+                p.drawLine(cx - 7, cy, cx + 7, cy)
+                p.drawLine(cx, cy - 7, cx, cy + 7)
+            # Size label near top-left of selection
+            p.setPen(QColor(255, 255, 255))
+            label_x = sel.x() + 4
+            label_y = sel.y() - 6 if sel.y() > 20 else sel.y() + 18
+            p.drawText(label_x, label_y, f"{sel.width()} × {sel.height()} px")
+
+        # Instruction banner
+        f = QFont()
+        f.setPointSize(11)
+        p.setFont(f)
+        p.setPen(QColor(220, 220, 220))
+        msg = "Drag to select zone — ESC to cancel"
+        fm = p.fontMetrics()
+        p.fillRect(
+            (self.width() - fm.horizontalAdvance(msg)) // 2 - 8, 6,
+            fm.horizontalAdvance(msg) + 16, fm.height() + 8,
+            QColor(0, 0, 0, 160),
+        )
+        p.drawText(
+            (self.width() - fm.horizontalAdvance(msg)) // 2,
+            6 + fm.ascent() + 4,
+            msg,
+        )
+        p.end()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._p1 = event.position().toPoint()
+            self._p2 = self._p1
+            self._dragging = True
+
+    def mouseMoveEvent(self, event):
+        if self._dragging:
+            self._p2 = event.position().toPoint()
+            self.update()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self._dragging:
+            self._dragging = False
+            self._p2 = event.position().toPoint()
+            sel = self._sel_rect()
+            if sel and sel.width() > 5 and sel.height() > 5:
+                # Find which monitor the selection center is on
+                global_center = sel.center() + self._origin
+                monitor_rect: Optional[QRect] = None
+                for screen in QApplication.instance().screens():
+                    if screen.geometry().contains(global_center):
+                        monitor_rect = screen.geometry()
+                        break
+                if monitor_rect is None:
+                    monitor_rect = QApplication.instance().primaryScreen().geometry()
+
+                # Convert to percentages relative to that monitor
+                sel_global = QRect(sel.topLeft() + self._origin, sel.size())
+                x_pct = (sel_global.x() - monitor_rect.x()) / monitor_rect.width()
+                y_pct = (sel_global.y() - monitor_rect.y()) / monitor_rect.height()
+                w_pct = sel_global.width() / monitor_rect.width()
+                h_pct = sel_global.height() / monitor_rect.height()
+                # Clamp
+                x_pct = max(0.0, min(0.99, x_pct))
+                y_pct = max(0.0, min(0.99, y_pct))
+                w_pct = max(0.01, min(1.0 - x_pct, w_pct))
+                h_pct = max(0.01, min(1.0 - y_pct, h_pct))
+                self.selection_made.emit(x_pct, y_pct, w_pct, h_pct)
+            self.close()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            self.close()
+
+    def closeEvent(self, event):
+        self.closed.emit()
+        super().closeEvent(event)
 
 
 class ZonePreviewWidget(QWidget):
@@ -148,6 +277,7 @@ class ZonePresetDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("New Zone Preset")
+        self._original_name: Optional[str] = None
         layout = QVBoxLayout(self)
 
         layout.addWidget(QLabel("Name:"))
@@ -182,6 +312,10 @@ class ZonePresetDialog(QDialog):
         self.end_y.setSuffix("%")
         self.end_y.setValue(100)
         zl.addWidget(self.end_y, 1, 3)
+        select_btn = QPushButton("Select on screen...")
+        select_btn.setToolTip("Hide this dialog and drag a rectangle on the monitor to set the zone")
+        select_btn.clicked.connect(self._select_on_screen)
+        zl.addWidget(select_btn, 2, 0, 1, 4)
         layout.addWidget(zone_box)
 
         fill_row = QHBoxLayout()
@@ -222,7 +356,23 @@ class ZonePresetDialog(QDialog):
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
 
+    def _select_on_screen(self):
+        self._overlay = ScreenSelectOverlay()
+        self._overlay.selection_made.connect(self._on_screen_selection)
+        self._overlay.closed.connect(self.raise_)
+        self._overlay.closed.connect(self.activateWindow)
+        self._overlay.show()
+        self._overlay.raise_()
+        self._overlay.activateWindow()
+
+    def _on_screen_selection(self, x_pct: float, y_pct: float, w_pct: float, h_pct: float):
+        self.start_x.setValue(round(x_pct * 100))
+        self.start_y.setValue(round(y_pct * 100))
+        self.end_x.setValue(min(100, round((x_pct + w_pct) * 100)))
+        self.end_y.setValue(min(100, round((y_pct + h_pct) * 100)))
+
     def prefill(self, preset: "Preset"):
+        self._original_name = preset.name
         self.name_edit.setText(preset.name)
         self.desc_edit.setText(preset.description)
         self.start_x.setValue(int(preset.zone_x_pct * 100))
@@ -261,6 +411,7 @@ class ZonePresetDialog(QDialog):
         return {
             "name": self.name_edit.text().strip(),
             "description": self.desc_edit.text().strip(),
+            "original_name": self._original_name,
             "zone_x_pct": sx,
             "zone_y_pct": sy,
             "zone_w_pct": ex - sx,
@@ -510,8 +661,10 @@ class ControlPanel(QWidget):
 
     def _create_zone_preset(self):
         dlg = ZonePresetDialog(self)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            self.zone_preset_requested.emit(dlg.get_values())
+        dlg.setWindowModality(Qt.WindowModality.NonModal)
+        dlg.accepted.connect(lambda: self.zone_preset_requested.emit(dlg.get_values()))
+        dlg.show()
+        self._zone_dlg = dlg   # keep reference to prevent garbage collection
 
     def _edit_preset(self):
         name = self.preset_combo.currentText()
@@ -520,9 +673,11 @@ class ControlPanel(QWidget):
             return
         if preset.mode == "zone":
             dlg = ZonePresetDialog(self)
+            dlg.setWindowModality(Qt.WindowModality.NonModal)
             dlg.prefill(preset)
-            if dlg.exec() == QDialog.DialogCode.Accepted:
-                self.zone_preset_requested.emit(dlg.get_values())
+            dlg.accepted.connect(lambda: self.zone_preset_requested.emit(dlg.get_values()))
+            dlg.show()
+            self._zone_dlg = dlg
         else:
             # Static preset: allow rename / description change
             dlg = SavePresetDialog(self)

@@ -9,6 +9,7 @@ All notable changes to EveGoggles are documented here.
 ### Added
 - Zone preset type: define a custom rectangular area on the monitor (start/end as % of monitor) with fill mode (Grid, Column, Row), optional aspect-ratio lock, and optional reverse order (bottom-up / right-to-left); thumbnails are distributed dynamically within the zone whenever clients are added or removed
 - "New Zone..." button in the Presets panel opens a dialog with a live visual preview to create and immediately apply a zone preset
+- "Select on screen..." button in the zone dialog: hides the dialog, shows a full-screen overlay, and lets the user drag a rectangle to set the zone coordinates automatically
 - "Edit" button in the Presets panel to modify an existing zone or static preset
 - "Delete" button in the Presets panel to remove a user-created preset
 - Screenshot in `assets/screenshot01.png` added to README
