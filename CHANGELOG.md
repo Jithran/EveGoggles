@@ -19,6 +19,7 @@ All notable changes to EveGoggles are documented here.
 - `CHANGELOG.md` (this file)
 
 ### Changed
+- Minimum refresh rate lowered to 30 ms (~33 fps) with 10 ms steps, replacing the previous 50 ms minimum with 50 ms steps
 - Preset system simplified to two dynamic modes: **Stacked** and **Mosaic**
   - **Stacked**: vertical column on the left (25% width), aspect ratio preserved, overflows clamped to available height
   - **Mosaic**: fills the entire preview monitor; cells stretch to fill the grid, no fixed aspect ratio; grid dimensions chosen to minimise empty slots

@@ -152,8 +152,8 @@ class ControlPanel(QWidget):
         refresh_row = QHBoxLayout()
         refresh_row.addWidget(QLabel("Refresh (ms):"))
         self.refresh_spin = QSpinBox()
-        self.refresh_spin.setRange(50, 2000)
-        self.refresh_spin.setSingleStep(50)
+        self.refresh_spin.setRange(30, 2000)
+        self.refresh_spin.setSingleStep(10)
         self.refresh_spin.setValue(100)
         self.refresh_spin.valueChanged.connect(
             lambda v: self.settings_changed.emit({"refresh_rate_ms": v}))
